@@ -1,0 +1,8 @@
+# Discord API wrapper (requires the 'voice' extra to install PyNaCl for audio playback)
+discord.py[voice]
+
+# Official async client for the ElevenLabs Text-to-Speech API
+elevenlabs
+
+# Utility to load environment variables from a .env file
+python-dotenv
