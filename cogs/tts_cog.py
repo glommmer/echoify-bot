@@ -6,8 +6,6 @@ text-to-speech processing, and background tasks for resource management.
 """
 
 import asyncio
-import glob
-import os
 import discord
 from discord.ext import commands, tasks
 
@@ -43,10 +41,11 @@ class TTSCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def set_text_channel(self, ctx):
         """
-        Sets the current text channel as the designated channel for automatic TTS.
+        Sets the current text channel as the designated channel for automatic TTS
+        for this specific server (guild).
         Only server administrators can use this command.
         """
-        config.TTS_TEXT_CHANNEL_ID = ctx.channel.id
+        config.TTS_TEXT_CHANNEL_IDS[ctx.guild.id] = ctx.channel.id
         await ctx.send(f"✅ TTS Text Channel set to: **#{ctx.channel.name}**")
         print(f"📢 Text channel updated: #{ctx.channel.name} (ID: {ctx.channel.id})")
 
@@ -54,27 +53,29 @@ class TTSCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def set_voice_channel(self, ctx):
         """
-        Sets the user's current voice channel as the designated channel for TTS output.
+        Sets the user's current voice channel as the designated channel for TTS output
+        for this specific server (guild).
         Only server administrators can use this command, and they must be in a voice channel.
         """
         if not ctx.author.voice:
             return await ctx.send("❌ Please join a voice channel first!")
 
-        config.TTS_VOICE_CHANNEL_ID = ctx.author.voice.channel.id
+        config.TTS_VOICE_CHANNEL_IDS[ctx.guild.id] = ctx.author.voice.channel.id
         await ctx.send(
             f"✅ TTS Voice Channel set to: **{ctx.author.voice.channel.name}**"
         )
         print(
-            f"🔊 Voice channel updated: {ctx.author.voice.channel.name} (ID: {config.TTS_VOICE_CHANNEL_ID})"
+            f"🔊 Voice channel updated: {ctx.author.voice.channel.name} (ID: {ctx.author.voice.channel.id})"
         )
 
     @commands.command(name="ttsinfo")
     async def tts_info(self, ctx):
         """
-        Displays the currently configured text and voice channels for TTS.
+        Displays the currently configured text and voice channels for TTS
+        in the current server.
         """
-        text_ch = self.bot.get_channel(config.TTS_TEXT_CHANNEL_ID)
-        voice_ch = self.bot.get_channel(config.TTS_VOICE_CHANNEL_ID)
+        text_ch = self.bot.get_channel(config.TTS_TEXT_CHANNEL_IDS.get(ctx.guild.id))
+        voice_ch = self.bot.get_channel(config.TTS_VOICE_CHANNEL_IDS.get(ctx.guild.id))
 
         text_ch_name = f"#{text_ch.name}" if text_ch else "Not set"
         voice_ch_name = voice_ch.name if voice_ch else "Not set"
@@ -87,13 +88,13 @@ class TTSCog(commands.Cog):
     @commands.command(name="say")
     async def say(self, ctx, *, text: str):
         """
-        Manually adds the provided text to the TTS queue to be spoken.
+        Manually adds the provided text to the server-specific TTS queue to be spoken.
 
         Args:
             text (str): The text message to be converted to speech.
         """
-        filename = f"tts_{ctx.author.id}.mp3"
-        await tts_engine.tts_queue.put((text, filename))
+        filename = f"tts_{ctx.message.id}.mp3"
+        await tts_engine.tts_queues[ctx.guild.id].put((text, filename))
         asyncio.create_task(tts_engine.process_queue(self.bot, ctx.guild))
         await ctx.send(f"🔊 Added to queue: *{text}*")
 
@@ -111,8 +112,8 @@ class TTSCog(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """
-        Listens for incoming messages in the designated text channel and
-        automatically queues them for TTS.
+        Listens for incoming messages in the designated text channel for the server
+        and automatically adds them to the server-specific TTS queue.
 
         Ignores messages from bots, commands (starting with '!'), and URLs.
         Truncates messages longer than 300 characters.
@@ -120,10 +121,9 @@ class TTSCog(commands.Cog):
         if message.author.bot:
             return
 
-        if (
-            config.TTS_TEXT_CHANNEL_ID
-            and message.channel.id == config.TTS_TEXT_CHANNEL_ID
-        ):
+        text_ch_id = config.TTS_TEXT_CHANNEL_IDS.get(message.guild.id)
+
+        if text_ch_id and message.channel.id == text_ch_id:
             text = message.content.strip()
 
             # Ignore empty messages, commands, or URLs
@@ -135,7 +135,7 @@ class TTSCog(commands.Cog):
                 text = text[:300] + "..."
 
             filename = f"tts_{message.id}.mp3"
-            await tts_engine.tts_queue.put((text, filename))
+            await tts_engine.tts_queues[message.guild.id].put((text, filename))
             asyncio.create_task(tts_engine.process_queue(self.bot, message.guild))
 
     # ── Tasks ───────────────────────────────────────────────

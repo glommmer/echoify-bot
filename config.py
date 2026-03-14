@@ -21,8 +21,9 @@ VOICE_ID = os.getenv("VOICE_ID")
 # ==========================================
 # Runtime Status (Dynamic Configuration)
 # ==========================================
-# These variables store the target channel IDs for TTS operations.
-# They are initialized as None and updated dynamically via bot commands
-# (e.g., !settextch, !setvoicech) while the bot is running.
-TTS_TEXT_CHANNEL_ID = None
-TTS_VOICE_CHANNEL_ID = None
+# These dictionaries store the target channel IDs for TTS operations per server.
+# They map a Discord Guild ID to a specific Channel ID.
+# They are initialized as empty dictionaries and updated dynamically
+# via bot commands (e.g., !settextch, !setvoicech) while the bot is running.
+TTS_TEXT_CHANNEL_IDS = {}  # {guild_id: channel_id}
+TTS_VOICE_CHANNEL_IDS = {}  # {guild_id: channel_id}
